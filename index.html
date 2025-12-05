@@ -2,26 +2,33 @@
 <html lang="ko">
 <head>
     <meta charset="utf-8">
-    <title>Dual Map GIS: Google & Kakao Sync (Fixed)</title>
+    <title>Dual Map GIS: Draggable CSS Walker</title>
     <style>
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; font-family: 'Malgun Gothic', dotum, sans-serif; overflow: hidden; }
         
         .container { display: flex; width: 100%; height: 100%; transition: all 0.3s; }
 
-        /* 좌측: 구글맵 */
+        /* [좌측] 구글맵 */
         #google-map-wrap { width: 50%; height: 100%; position: relative; border-right: 1px solid #aaa; box-sizing: border-box; transition: width 0.3s; }
-        #google-map { width: 100%; height: 100%; }
+        #google-streetview { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 5; display: none; }
+        #google-map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; transition: all 0.3s ease; }
+        
+        /* 구글맵 미니맵 스타일 */
+        #google-map.minimap-mode {
+            width: 300px !important; height: 250px !important;
+            top: auto !important; bottom: 20px; left: 20px;
+            border: 2px solid white; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); z-index: 20; 
+        }
 
-        /* 우측: 카카오맵 */
+        /* [우측] 카카오맵 */
         .map_wrap { position: relative; width: 50%; height: 100%; transition: width 0.3s; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; background: #eee; }
         
-        /* 미니맵 스타일 */
+        /* 카카오 미니맵 스타일 */
         #map.minimap {
-            width: 400px !important; height: 350px !important; 
+            width: 300px !important; height: 250px !important; 
             top: auto !important; bottom: 0; left: 0;
-            z-index: 20; 
-            border-top: 1px solid #888; border-right: 1px solid #888;
+            z-index: 20; border-top: 1px solid #888; border-right: 1px solid #888;
             box-shadow: 2px -2px 5px rgba(0,0,0,0.3);
         }
 
@@ -44,9 +51,38 @@
 
         .info-overlay { background: white; border: 1px solid #333; border-radius: 4px; padding: 10px; font-size: 12px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); white-space: nowrap; }
         .measure-label { background: #fff; padding: 3px 6px; border: 1px solid #888; border-radius: 3px; font-size: 11px; color: #333; box-shadow: 1px 1px 3px rgba(0,0,0,0.2); white-space: nowrap; }
-        .MapWalker { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; pointer-events: none; }
-        .MapWalker .angleBack { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 40px solid rgba(51, 150, 255, 0.4); transform-origin: center bottom; margin-left: -20px; margin-top: -40px; z-index: 1; }
-        .MapWalker .figure { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 16px solid #ff3300; transform-origin: center center; margin-left: -8px; margin-top: -8px; z-index: 2; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
+        
+        /* [수정] CSS로 직접 그리는 로드뷰 마커 (이미지 X -> 404 오류 해결) */
+        .MapWalker {
+            position: absolute;
+            width: 24px; height: 24px;
+            margin: -12px 0 0 -12px; /* 중심점 보정 */
+            cursor: grab; /* 드래그 가능 커서 */
+            z-index: 999;
+        }
+        .MapWalker:active { cursor: grabbing; }
+
+        /* 로드뷰 시야각(파란 부채꼴) */
+        .MapWalker .angleBack {
+            position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+            border-left: 20px solid transparent; border-right: 20px solid transparent;
+            border-top: 40px solid rgba(51, 150, 255, 0.4);
+            transform-origin: center bottom;
+            margin-left: -20px; margin-top: -40px;
+            z-index: 1; pointer-events: none; /* 드래그 방해 금지 */
+        }
+
+        /* 사람/방향 표시(빨간 화살표) */
+        .MapWalker .figure {
+            position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+            border-left: 8px solid transparent; border-right: 8px solid transparent;
+            border-bottom: 16px solid #ff3300;
+            transform-origin: center center;
+            margin-left: -8px; margin-top: -8px;
+            z-index: 2;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+            pointer-events: none; /* 드래그 방해 금지 */
+        }
         
         .error-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #555; display: none; z-index: 999; background: rgba(255,255,255,0.8); padding: 20px; }
     </style>
@@ -55,6 +91,7 @@
 
 <div class="container">
     <div id="google-map-wrap">
+        <div id="google-streetview"></div>
         <div id="google-map"></div>
     </div>
 
@@ -86,10 +123,9 @@
     <p>API 키 설정을 확인해주세요.</p>
 </div>
 
-<!-- 1. 카카오맵 SDK (먼저 로드) -->
+<!-- 1. 카카오맵 SDK -->
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8d2d116d6a534a98e73133808f5843a6&libraries=services,drawing,clusterer"></script>
 
-<!-- 2. 메인 스크립트 로직 (initGoogleMap 정의 포함) -->
 <script>
     var mapContainer = document.getElementById('map');
     var rvContainer = document.getElementById('roadview');
@@ -97,10 +133,13 @@
     var resizer = document.getElementById('resizer');
     
     var googleMapWrap = document.getElementById('google-map-wrap');
+    var googleMapDiv = document.getElementById('google-map');
+    var googleSvDiv = document.getElementById('google-streetview');
     var kakaoWrap = document.getElementById('kakao-wrap');
 
     var map = null; 
     var gMap = null; 
+    var gPanorama = null; 
     var syncLock = false; 
 
     var ps = new kakao.maps.services.Places();
@@ -118,6 +157,10 @@
 
     var startLat = 37.566826;
     var startLng = 126.9786567;
+    var isRoadviewActive = false;
+    
+    // Walker 드래그 상태 관리
+    var isWalkerDragging = false; 
 
     // 카카오맵 초기화
     if (typeof kakao === 'undefined') {
@@ -132,7 +175,7 @@
         kakao.maps.event.addListener(map, 'zoom_changed', syncGoogleFromKakao);
     }
 
-    // [중요] initGoogleMap 함수를 전역(window)에 정의
+    // 구글맵 초기화
     window.initGoogleMap = function() {
         var gOptions = { 
             center: { lat: startLat, lng: startLng }, 
@@ -140,15 +183,40 @@
             disableDefaultUI: false, 
             scaleControl: true 
         };
-        gMap = new google.maps.Map(document.getElementById('google-map'), gOptions);
+        gMap = new google.maps.Map(googleMapDiv, gOptions);
+
+        gPanorama = new google.maps.StreetViewPanorama(
+            googleSvDiv, 
+            {
+                visible: false,
+                enableCloseButton: true // 종료 버튼 활성화
+            }
+        );
+        gMap.setStreetView(gPanorama);
+
+        // 스트리트뷰 상태 감지
+        gPanorama.addListener('visible_changed', function() {
+            var isVisible = gPanorama.getVisible();
+            if (isVisible) {
+                googleMapDiv.classList.add('minimap-mode');
+                googleSvDiv.style.display = 'block';
+            } else {
+                googleMapDiv.classList.remove('minimap-mode');
+                googleSvDiv.style.display = 'none';
+                google.maps.event.trigger(gMap, "resize");
+            }
+        });
+
+        gPanorama.addListener('closeclick', function() {
+            gPanorama.setVisible(false); 
+        });
         
-        // 구글맵 이벤트 리스너
         gMap.addListener('center_changed', syncKakaoFromGoogle);
         gMap.addListener('zoom_changed', syncKakaoFromGoogle);
         gMap.addListener('drag', syncKakaoFromGoogle);
     };
 
-    // 동기화 함수들
+    // 동기화 함수
     function syncGoogleFromKakao() {
         if (!gMap || syncLock) return;
         syncLock = true;
@@ -172,11 +240,56 @@
         setTimeout(function(){ syncLock = false; }, 50);
     }
 
+    // [수정] 순수 CSS로 Walker 도형 생성 (이미지 없음) & 드래그 이벤트 연결
     function createWalkerContent(angle) {
-        return `<div class="MapWalker">
+        return `<div class="MapWalker" onmousedown="onWalkerMouseDown(event)">
                     <div class="angleBack" style="transform: rotate(${angle}deg);"></div>
                     <div class="figure" style="transform: rotate(${angle}deg);"></div>
                 </div>`;
+    }
+
+    // Walker 드래그 이벤트
+    function onWalkerMouseDown(e) {
+        isWalkerDragging = true;
+        e.preventDefault(); 
+        e.stopPropagation(); // 지도 드래그 방지
+        
+        document.addEventListener('mousemove', onWalkerMouseMove);
+        document.addEventListener('mouseup', onWalkerMouseUp);
+    }
+
+    function onWalkerMouseMove(e) {
+        if (!isWalkerDragging || !mapWalker) return;
+        
+        var projection = map.getProjection();
+        var mapContainerRect = mapContainer.getBoundingClientRect();
+        
+        var point = new kakao.maps.Point(
+            e.clientX - mapContainerRect.left,
+            e.clientY - mapContainerRect.top
+        );
+        
+        var latlng = projection.fromContainerPixelToLatLng(point);
+        mapWalker.setPosition(latlng);
+    }
+
+    function onWalkerMouseUp(e) {
+        if (!isWalkerDragging) return;
+        isWalkerDragging = false;
+        
+        document.removeEventListener('mousemove', onWalkerMouseMove);
+        document.removeEventListener('mouseup', onWalkerMouseUp);
+
+        if (mapWalker) {
+            var position = mapWalker.getPosition();
+            
+            // 드래그 종료 위치에서 로드뷰 갱신
+            rvClient.getNearestPanoId(position, 50, function(panoId) {
+                if (panoId) {
+                    rv.setPanoId(panoId, position);
+                }
+            });
+        }
     }
 
     function searchPlaces() {
@@ -192,7 +305,10 @@
             searchMarker = new kakao.maps.Marker({ position: targetPosition, map: map });
             map.setCenter(targetPosition);
             map.setLevel(3);
-            if (currentMode === 'roadview') toggleRoadview(targetPosition);
+            
+            if (currentMode === 'roadview' && isRoadviewActive) {
+                toggleRoadview(targetPosition);
+            }
         } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
             alert('검색 결과가 없습니다.');
         } else {
@@ -222,49 +338,59 @@
         currentMode = mode;
 
         if (mode === 'roadview') {
-            googleMapWrap.style.width = '0%';
-            kakaoWrap.style.width = '100%';
-
-            rvContainer.style.display = 'block';
-            rvCloseBtn.style.display = 'block';
-            resizer.style.display = 'block';
-
-            mapContainer.style.width = ''; 
-            mapContainer.style.height = ''; 
-            
-            mapContainer.classList.add('minimap');
             map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-
-            setTimeout(function() { 
-                map.relayout(); 
-                rv.relayout(); 
-                toggleRoadview(map.getCenter());
-            }, 300);
+            map.setCursor('url(https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/cursor/roadview.cur), default');
+            isRoadviewActive = false;
 
         } else if (mode === 'distance' || mode === 'area') {
             map.setCursor('crosshair');
         } else {
             map.setCursor('default');
-            if (googleMapWrap.style.width === '0%') {
+            if (isRoadviewActive) {
                 closeRoadviewUI();
             }
         }
     }
 
+    function activateRoadviewUI(targetCenter) {
+        if (isRoadviewActive) {
+            if (targetCenter) map.setCenter(targetCenter);
+            return; 
+        }
+
+        rvContainer.style.display = 'block';
+        rvCloseBtn.style.display = 'block';
+        resizer.style.display = 'block';
+
+        mapContainer.style.width = ''; 
+        mapContainer.style.height = ''; 
+        
+        mapContainer.classList.add('minimap');
+        
+        setTimeout(function() { 
+            map.relayout(); 
+            rv.relayout();
+            if (targetCenter) {
+                map.setCenter(targetCenter);
+            }
+        }, 100);
+
+        isRoadviewActive = true;
+    }
+
     function closeRoadviewUI() {
+        isRoadviewActive = false;
+
         rvContainer.style.display = 'none';
         rvCloseBtn.style.display = 'none';
-        
-        googleMapWrap.style.width = '50%';
-        kakaoWrap.style.width = '50%';
-        
-        mapContainer.classList.remove('minimap');
         resizer.style.display = 'none';
+        mapContainer.classList.remove('minimap');
 
         mapContainer.style.width = '100%';
         mapContainer.style.height = '100%';
 
         map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+        map.setCursor('default');
         
         if(mapWalker) {
             mapWalker.setMap(null);
@@ -278,50 +404,24 @@
         }, 300);
     }
 
-    function toggleRoadview(position) {
-        rvClient.getNearestPanoId(position, 50, function(panoId) {
-            if (panoId) {
-                rv.setPanoId(panoId, position);
-                if(!mapWalker) initWalker(position);
-                else moveWalker(position);
-            }
-        });
-    }
-
-    var isResizing = false;
-    resizer.addEventListener('mousedown', function(e) { isResizing = true; e.preventDefault(); e.stopPropagation(); });
-    window.addEventListener('mousemove', function(e) {
-        if (!isResizing) return;
-        if (!mapContainer.classList.contains('minimap')) return;
-        var newWidth = e.clientX;
-        var newHeight = window.innerHeight - e.clientY;
-        if(newWidth < 200) newWidth = 200;
-        if(newHeight < 200) newHeight = 200;
-        mapContainer.style.width = newWidth + 'px';
-        mapContainer.style.height = newHeight + 'px';
-        map.relayout();
-        if(mapWalker) map.setCenter(mapWalker.getPosition());
-    });
-    window.addEventListener('mouseup', function() { if (isResizing) { isResizing = false; map.relayout(); } });
-
-    function initWalker(position) {
-        if(mapWalker) mapWalker.setMap(null);
-        mapWalker = new kakao.maps.CustomOverlay({ position: position, content: createWalkerContent(0), map: map });
-    }
-    function moveWalker(position) { if(mapWalker) mapWalker.setPosition(position); }
-    kakao.maps.event.addListener(rv, 'viewpoint_changed', function() {
-        var viewpoint = rv.getViewpoint();
-        if(mapWalker) mapWalker.setContent(createWalkerContent(viewpoint.pan));
-    });
-    kakao.maps.event.addListener(rv, 'position_changed', function() {
-        var rvPos = rv.getPosition();
-        moveWalker(rvPos);
-        map.setCenter(rvPos);
-    });
     kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
         var clickPosition = mouseEvent.latLng;
-        if (currentMode === 'roadview') { toggleRoadview(clickPosition); return; }
+
+        if (currentMode === 'roadview') {
+            rvClient.getNearestPanoId(clickPosition, 50, function(panoId) {
+                if (panoId) {
+                    activateRoadviewUI(clickPosition);
+                    rv.setPanoId(panoId, clickPosition);
+                    
+                    if(!mapWalker) initWalker(clickPosition);
+                    else mapWalker.setPosition(clickPosition);
+                }
+            });
+            return;
+        }
+
         if (currentMode !== 'distance' && currentMode !== 'area') return;
+
         drawingPath.push(clickPosition);
         var marker = new kakao.maps.Marker({ position: clickPosition, map: map });
         allMarkers.push(marker);
@@ -349,16 +449,91 @@
             }
         }
     });
+
+    function toggleRoadview(position) {
+        if (!isRoadviewActive) activateRoadviewUI(position);
+        
+        rvClient.getNearestPanoId(position, 50, function(panoId) {
+            if (panoId) {
+                rv.setPanoId(panoId, position);
+                if(!mapWalker) initWalker(position);
+                else mapWalker.setPosition(position);
+            }
+        });
+    }
+
+    var isResizing = false;
+    resizer.addEventListener('mousedown', function(e) { isResizing = true; e.preventDefault(); e.stopPropagation(); });
+    window.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        if (!mapContainer.classList.contains('minimap')) return;
+
+        var rect = kakaoWrap.getBoundingClientRect();
+        var newWidth = e.clientX - rect.left;
+        var newHeight = window.innerHeight - e.clientY;
+
+        if(newWidth < 200) newWidth = 200;
+        if(newHeight < 200) newHeight = 200;
+        if(newWidth > rect.width) newWidth = rect.width;
+
+        mapContainer.style.width = newWidth + 'px';
+        mapContainer.style.height = newHeight + 'px';
+        
+        map.relayout();
+        if(mapWalker) map.setCenter(mapWalker.getPosition());
+    });
+    window.addEventListener('mouseup', function() { if (isResizing) { isResizing = false; map.relayout(); } });
+
+
+    // Walker 초기화
+    function initWalker(position) {
+        if(mapWalker) mapWalker.setMap(null);
+        mapWalker = new kakao.maps.CustomOverlay({
+            position: position,
+            content: createWalkerContent(0),
+            map: map
+        });
+    }
+
+// moveWalker: 드래그 중이 아닐 때만 외부(Roadview 이동 등)에서 업데이트 허용
+    function moveWalker(position) { 
+        if(mapWalker && !isWalkerDragging) {
+            mapWalker.setPosition(position);
+        }
+    }
+
+    // 로드뷰 시점(Viewpoint) 변경 -> Walker 회전 (CSS transform 업데이트)
+    kakao.maps.event.addListener(rv, 'viewpoint_changed', function() {
+        var viewpoint = rv.getViewpoint();
+        if(mapWalker) {
+             // 각도가 변경되면 CSS 회전을 위해 컨텐츠를 갱신합니다.
+             // 이때 createWalkerContent 내부에 onmousedown 이벤트가 포함되어 있어 드래그 기능이 유지됩니다.
+             mapWalker.setContent(createWalkerContent(viewpoint.pan));
+        }
+    });
+
+    // 로드뷰 위치(Position) 변경 -> Walker 이동 및 지도 중심 이동
+    kakao.maps.event.addListener(rv, 'position_changed', function() {
+        var rvPos = rv.getPosition();
+        moveWalker(rvPos); // 지도 상의 마커 이동
+        map.setCenter(rvPos); // 지도 중심 이동
+    });
+
+    // ==========================================
+    // 측정 도구 (거리/면적) 관련 이벤트
+    // ==========================================
     kakao.maps.event.addListener(map, 'mousemove', function(mouseEvent) {
         if (!drawingObject) return;
         var path = drawingPath.slice();
         path.push(mouseEvent.latLng);
         drawingObject.setPath(path);
     });
+
     kakao.maps.event.addListener(map, 'rightclick', function(mouseEvent) {
         if (!drawingObject) return;
         var position = drawingPath[drawingPath.length - 1];
         var content = '';
+        
         if (currentMode === 'distance') {
             var dist = Math.round(drawingObject.getLength());
             content = `<div class="info-overlay">총 거리 <span class="number">${dist.toLocaleString()}m</span></div>`;
@@ -367,6 +542,7 @@
             var pyeong = (area * 0.3025).toFixed(1);
             content = `<div class="info-overlay">총 면적 <span class="number">${area.toLocaleString()}m²</span><br><span class="desc">(${Number(pyeong).toLocaleString()}평)</span></div>`;
         }
+        
         var overlay = new kakao.maps.CustomOverlay({ map: map, position: position, content: content, yAnchor: 1 });
         allOverlays.push(overlay);
         allShapes.push(drawingObject);
@@ -374,28 +550,26 @@
         drawingPath = [];
     });
 
+    // 초기화 함수
     function clearMeasurements() {
         allOverlays.forEach(o => o.setMap(null));
         allShapes.forEach(s => s.setMap(null));
         allMarkers.forEach(m => m.setMap(null));
         allOverlays = []; allShapes = []; allMarkers = [];
         stopDrawing();
+        
         if (searchMarker) { searchMarker.setMap(null); searchMarker = null; }
         document.getElementById('keyword').value = '';
     }
-    function stopDrawing() { if (drawingObject) drawingObject.setMap(null); drawingObject = null; drawingPath = []; }
+
+    function stopDrawing() { 
+        if (drawingObject) drawingObject.setMap(null); 
+        drawingObject = null; 
+        drawingPath = []; 
+    }
 </script>
 
-
-<!-- 3. 구글맵 API (제일 마지막에 로드하여 initGoogleMap 정의 후 실행되도록 함) -->
-<!-- YOUR_GOOGLE_API_KEY 부분에 본인의 키를 입력하세요 -->
+<!-- 구글맵 API Key 적용 (제일 마지막에 로드) -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBYXu5yKdW71VuKmI-N2M2xbvMaYTK2HCg&callback=initGoogleMap" async defer></script>
 </body>
 </html>
-
-
-
-
-
-
-
