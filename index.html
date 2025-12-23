@@ -2,81 +2,68 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>Dual Map Viewer (Google / Kakao / Naver) + Full GIS Features</title>
+  <title>Dual Map Viewer - Final (Optimized)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <style>
     html,body{margin:0;height:100%;font-family:Arial;}
     #controls{display:flex;gap:20px;padding:8px;background:#222;color:#fff;flex-wrap:wrap;}
     .panel{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-    #searchInput{width:260px;padding:4px 6px;}
+    #searchInput{width:260px;padding:4px 6px;font-size: 16px; font-family: Arial, sans-serif;}
+    #historySelect { width: 140px; height: 28px; padding: 4px 6px; font-size: 15px; margin-left: 5px; }
     #container{display:flex;height:calc(100% - 48px);}
-    .map{flex:1;position:relative;}
+    .map{flex:1;position:relative; border-right: 1px solid #444;}
+    .map:last-child{border-right:none;}
+
+    /* 자동완성 */
     #suggestList{
       position:absolute;top:36px;left:42%;transform:translateX(-50%);
       width:280px;max-height:600px;overflow-y:auto;background:#fff;
-      border:1px solid #888;z-index:100;display:none;
+      border:1px solid #888;z-index:2000;display:none;
     }
-    #suggestList div{padding:6px 10px;border-bottom:1px solid #eee;cursor:pointer;color:black;}
-    #suggestList div:hover{background:#cce5ff;}
-    
+    #suggestList div{padding:8px 10px;border-bottom:1px solid #eee;cursor:pointer;color:black;font-size: 15px;}
+    #suggestList div:hover, #suggestList div.active{background:#cce5ff;}
 
-    /* ******* 내가 추가한 코드***** */
-    /***** ^------------------^ ****
-    /* Input 박스 폰트 */
-    #searchInput {
-      font-size: 16px !important;  /* 12px=작게, 16px=크게 */
-      font-family: Arial, sans-serif;
-    }
+    /* 컨트롤 스타일 */
+    #leftType, #rightType { padding: 0 12px; font-size: 16px; }
+    select#leftSelect, select#rightSelect { width: 86px; height: 26px; padding: 4px 6px; font-size: 15px; }
+    #searchBtn, #clearSearchBtn { 
+        padding: 1px 12px; 
+        height: 28px; 
+        line-height: 20px;
+        font-size: 13px; 
+        min-width: 50px; }
 
-    /* 자동완성 리스트 폰트 */
-    #suggestList div {
-      font-size: 16px !important;  /* Input과 동일하게 */
-      font-family: Arial, sans-serif;
-    }
-
-    /* 자동완성 리스트 선택 상태 */
-    #suggestList div.active {
-      background: #cce5ff !important;
-    }
-
-    /* 지도/위성 텍스트 위치 조절 */
-    
-    #leftType, #rightType {
-      padding-top: 0px;    /* 텍스트 위쪽 여백 ↑ */
-      padding-bottom: 0px;  /* 텍스트 아래쪽 여백 ↑ */
-      padding-left: 12px;   /* 좌우는 그대로 */
-      padding-right: 12px;
-      font-size: 16px; 
+    /* 공통 미니맵 스타일 */
+    .minimap-style {
+      position: absolute !important;
+      width: 350px !important; height: 250px !important;
+      top: auto !important; bottom: 0; left: 0;
+      z-index: 20; border-top: 1px solid #888; border-right: 1px solid #888;
+      box-shadow: 2px -2px 5px rgba(0,0,0,0.3);
     }
 
-    /* 지도선택 리스트 박스 크기 조절 */
-    select#leftSelect, select#rightSelect {
-      width: 86px;      /* 가로 길이 */
-      height: 26px;     /* 세로 높이 */
-      padding: 4px 6px; /* 내부 여백 */
-      font-size: 15px;  /* 글자 크기 */
+    /* 닫기 버튼 공통 스타일 (네이버 깜빡임 해결 적용) */
+    .close-btn-style {
+      position:absolute; top:10px; right:10px; 
+      z-index: 10001; /* [수정] Z-index 상향 */
+      transform: translateZ(0); /* [수정] GPU 레이어 강제 생성 */
+      padding:5px 10px; background:#fff; color:#333;
+      border:1px solid #ccc; cursor:pointer; border-radius:3px;
+      font-weight:bold; font-size: 12px; display:none; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
-    /* Go, 지움버튼 크기조절 - 내가 추가한 코드 */
-    #searchBtn, #clearSearchBtn {
-      padding: 6px 12px;  /* 위아래 6px, 좌우 12px 여백 */
-      height: 28px;       /* 고정 높이 */
-      font-size: 13px;    /* 글자 크기 */
-      min-width: 50px;    /* 최소 너비 */
-    }
-    /* ******* 내가 추가한 코드***** */
+    .close-btn-style:hover { background: #f5f5f5; }
 
-    /* 카카오 GIS 기능 스타일 */
-    .kakao-wrap-inner{position:relative;width:100%;height:100%;}
-    #kakao-roadview{position:absolute;top:0;left:0;width:100%;height:100%;background:#333;z-index:5;display:none;}
-    #kakao-map{position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;background:#eee;}
-    #kakao-map.minimap{
-      width:400px !important;height:350px !important;top:auto !important;bottom:0;left:0;
-      z-index:20;border-top:1px solid #888;border-right:1px solid #888;
-      box-shadow:2px -2px 5px rgba(0,0,0,0.3);
+    /* 네이버용 거리뷰 버튼 */
+    .street-btn-style {
+      position:absolute; top:10px; right:10px; z-index:30;
+      padding:5px 10px; background:#fff; border:1px solid #ccc;
+      cursor:pointer; border-radius:3px; font-weight:bold; font-size:12px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.2); color:#333;
     }
 
-    /* GIS 툴바 */
+    /* 카카오 GIS 툴바 */
     .kakao-toolbar{
       position:absolute;top:5px;right:40px;z-index:30;
       background:white;border-radius:5px;
@@ -92,14 +79,12 @@
     .kakao-toolbar button.active{background:#3396ff;color:white;}
     .kakao-toolbar button.delete-btn{color:#e14f4f;}
 
-    /* 로드뷰 닫기 */
-    #rv-close-btn{
-      position:absolute;top:10px;right:10px;z-index:30;
-      padding:10px 15px;background:#333;color:white;
-      border:1px solid #555;cursor:pointer;border-radius:3px;
-      font-weight:bold;display:none;
+    /* 로드뷰 상태 표시 */
+    .roadview-status {
+      position:absolute;top:10px;left:10px;z-index:30;
+      background:rgba(0,0,0,0.7);color:white;padding:8px 12px;
+      border-radius:4px;font-size:13px;font-weight:bold;
     }
-    #rv-close-btn:hover{background:#555;}
 
     /* 측정 오버레이 */
     .info-overlay{
@@ -113,20 +98,12 @@
       box-shadow:1px 1px 3px rgba(0,0,0,0.2);white-space:nowrap;
     }
 
-    /* 검색 마커 */
+    /* 검색 마커 & 워커 */
     .search-marker {
-      width: 24px;
-      height: 32px;
-      margin-left: -12px;
-      margin-top: -32px;
+      width: 24px; height: 32px; margin-left: -12px; margin-top: -32px;
       background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAyNCAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDBMMCAxNiBMNiAxNiBMNiAyNCBMMTIgMjQgTDE4IDE2IEwyNCAxNiBaIiBmaWxsPSIjRkY0MDAwIi8+CjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjMiIGZpbGw9IiNGRkYiLz4KPC9zdmc+') no-repeat;
     }
-
-    /* 워커 로드뷰의 걸음*/
-    .MapWalker{
-      position:absolute;width:24px;height:24px;
-      margin:-12px 0 0 -12px;pointer-events:none;
-    }
+    .MapWalker{ position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;pointer-events:none; }
     .MapWalker .angleBack{
       position:absolute;top:50%;left:50%;width:0;height:0;
       border-left:20px solid transparent;border-right:20px solid transparent;
@@ -140,40 +117,38 @@
       transform-origin:center center;margin-left:-8px;margin-top:-8px;z-index:2;
       filter:drop-shadow(0 2px 2px rgba(0,0,0,0.3));
     }
+    /* 네이버용 워커 */
+    .naver-marker-arrow {
+      width: 0; height: 0;
+      border-left: 10px solid transparent; border-right: 10px solid transparent;
+      border-bottom: 24px solid #4DC4FF;
+      transform-origin: center center; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+    }
   </style>
 
-  <!-- SDKs (제공 키 그대로 사용) -->
+  <!-- SDKs -->
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=KAKAO_KEY_PLACEHOLDER&libraries=services,drawing,clusterer"></script>
   <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=NAVER_KEY_PLACEHOLDER"></script>
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_KEY_PLACEHOLDER&callback=init"></script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_KEY_PLACEHOLDER&callback=init"></script>  
 </head>
 
 <body>
 <div id="controls">
   <div class="panel">
     LEFT:
-    <select id="leftSelect">
-      <option value="google">Google</option>
-      <option value="kakao">Kakao</option>
-      <option value="naver">Naver</option>
-    </select>
+    <select id="leftSelect"><option value="google">Google</option><option value="kakao">Kakao</option><option value="naver">Naver</option></select>
     <button id="leftType">지도/위성</button>
   </div>
   <div class="panel">
     RIGHT:
-    <select id="rightSelect">
-      <option value="google">Google</option>
-      <option value="kakao">Kakao</option>
-      <option value="naver">Naver</option>
-    </select>
+    <select id="rightSelect"><option value="google">Google</option><option value="kakao" selected>Kakao</option><option value="naver">Naver</option></select>
     <button id="rightType">지도/위성</button>
   </div>
   <div class="panel" style="position:relative;">
     검색: <input id="searchInput" placeholder="주소 또는 지명 입력" autocomplete="off"/>
-    
     <button id="searchBtn">Go</button>
-    <!-- 요청 1: '지우기' → '지움'으로 변경, 요청 2: Go 버튼 크기 동일하게 -->
-    <button id="clearSearchBtn" style="padding:0px 10px;font-size:14px;">지 움</button>
+    <button id="clearSearchBtn">지 움</button>
+    <select id="historySelect"><option value="">최근 검색 기록</option></select>
     <div id="suggestList"></div>
   </div>
 </div>
@@ -184,417 +159,600 @@
 </div>
 
 <script>
-/* ===== 상태 ===== */
-let syncing=false;
-let state={lat:37.5665,lng:126.9780,zoom:13};
-let left={type:"google",map:null,satellite:true};
-let right={type:"kakao",map:null,satellite:false};
+/* ===== 상태 관리 ===== */
+let syncing = false;
+let rvSyncing = false; // 로드뷰 위치 동기화 잠금
+let state = { lat: 37.5665, lng: 126.9780, zoom: 13 };
 
-/* GIS 변수 (카카오) */
-let kakaoMap=null, kakaoRv=null, kakaoRvClient=null, kakaoWalker=null, kakaoGeocoder=null, kakaoPs=null;
-let currentMode='default', drawingObject=null, drawingPath=[], allOverlays=[], allShapes=[], allMarkers=[], kakaoSearchMarker=null;
-let kakaoRvMode=false, syncLock=false;
+/* Side State Objects */
+let left = { 
+  type: "google", map: null, satellite: true, 
+  panorama: null, roadviewActive: false,
+  gis: createGisState(),
+  naverState: { active: false, streetLayer: null, marker: null },
+  searchMarker: null
+};
+let right = { 
+  type: "kakao", map: null, satellite: false, 
+  panorama: null, roadviewActive: false,
+  gis: createGisState(),
+  naverState: { active: false, streetLayer: null, marker: null },
+  searchMarker: null
+};
 
-/* 검색 마커 (좌/우 각각) */
-let searchMarkerLeft = null;
-let searchMarkerRight = null;
-
-/* 우클릭 풍선 오버레이 및 마커 */
-let rightClickOverlay=null;
-let rightClickMarker=null;
-
-/* 키보드 네비게이션용 변수 */
+/* 검색 관련 전역 */
+let searchHistory = JSON.parse(localStorage.getItem('mapSearchHistory')) || [];
+let kakaoSearchMarker = null; // 레거시 호환
 let activeSuggestIndex = -1;
 
-/* DOM 요소 */
-let kakaoWrap, kakaoRoadviewEl, kakaoMapEl, rvCloseBtn, kakaoToolbar;
-let districtBtn, roadviewBtn, distanceBtn, areaBtn, clearBtn;
+// 카카오 서비스 객체
+let kakaoGeocoder = null;
+let kakaoPs = null;
+let kakaoRvClient = null; 
+
+function createGisState() {
+  return {
+    mode: 'default',
+    waiting: false, 
+    drawing: null, 
+    path: [],
+    overlays: [],
+    shapes: [],
+    markers: [],
+    walker: null,
+    statusEl: null
+  };
+}
 
 function init(){
-  leftSelect.value=left.type; rightSelect.value=right.type;
-  createMaps();
+  if(typeof kakao !== 'undefined' && kakao.maps && kakao.maps.services){
+    kakaoGeocoder = new kakao.maps.services.Geocoder();
+    kakaoPs = new kakao.maps.services.Places();
+    kakaoRvClient = new kakao.maps.RoadviewClient();
+  }
+
+  leftSelect.value = left.type; 
+  rightSelect.value = right.type;
+
   bindUI();
-  applyType(left,leftType);
-  applyType(right,rightType);
+  createMaps();
+  renderHistory();
 }
 
-/* ===== 맵 생성/파괴 ===== */
+/* ===== 맵 생성 및 관리 ===== */
 function createMaps(){
-  destroyMap(left);
-  left.map=createMap(left.type,"leftMap");
-
-  destroyMap(right);
-  if(right.type==="kakao"){
-    createKakaoGISMap();
-  }else{
-    hideKakaoElements();
-    right.map=createMap(right.type,"rightMap");
-  }
-
-  bindEvents(left,right);
-  bindEvents(right,left);
+  createMap(left, "leftMap");
+  createMap(right, "rightMap");
+  
+  bindEvents(left, right);
+  bindEvents(right, left);
+  
+  bindRoadviewSync();
 }
 
-function destroyMap(side){
-  if(side.map){
-    if(side.type==="google") side.map=null;
-    if(side.type==="naver") side.map?.destroy?.();
-    if(side.type==="kakao" && side.map!==kakaoMap) side.map=null;
+function createMap(side, containerId) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = ""; 
+  
+  if(side.map) {
+    if(side.type === "naver" && side.map.destroy) side.map.destroy();
+    side.map = null;
+    side.panorama = null;
+    side.roadviewActive = false;
+    side.gis = createGisState();
+    side.naverState = { active: false, streetLayer: null, marker: null };
+    side.searchMarker = null;
   }
-}
 
-function createMap(type,id){
-  const el=document.getElementById(id);
-  el.innerHTML="";
-  if(type==="google"){
-    return new google.maps.Map(el,{
-      center:state,
-      zoom:state.zoom,
-      mapTypeId:"satellite",
-      maxZoom:21,
-      zoomControl: true,           
-      zoomControlOptions: {        
-      position: google.maps.ControlPosition.RIGHT,  
-      style: google.maps.ZoomControlStyle.ZoomControlStyle           
+  // --- 1. GOOGLE MAP ---
+  if(side.type === "google") {
+    const mapInner = document.createElement("div");
+    mapInner.style.width = "100%"; mapInner.style.height = "100%";
+    el.appendChild(mapInner);
+
+    const panoDiv = document.createElement("div");
+    panoDiv.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;z-index:15;display:none;";
+    el.appendChild(panoDiv);
+
+    const closeBtn = document.createElement("div");
+    closeBtn.className = "close-btn-style";
+    closeBtn.innerHTML = "Street 닫기 X"; 
+    el.appendChild(closeBtn);
+
+    const map = new google.maps.Map(mapInner, {
+      center: state, zoom: state.zoom, mapTypeId: "satellite",
+      maxZoom: 21,
+      // 컨트롤 위치 (요청사항 반영)
+      zoomControl: false,
+      zoomControlOptions: { position: google.maps.ControlPosition.BOTTOM_LEFT },
+      streetViewControl: true,
+      streetViewControlOptions: { position: google.maps.ControlPosition.TOP_RIGHT }
+    });
+
+    const coverageLayer = new google.maps.StreetViewCoverageLayer();
+    const panorama = new google.maps.StreetViewPanorama(panoDiv, {
+      enableCloseButton: false, visible: false, zoom: 1, pov: { heading: 0, pitch: 0 }
+    });
+    map.setStreetView(panorama);
+    side.panorama = panorama;
+
+    // [수정] 거리뷰 실행 시 미니맵 중심 보정 로직
+    panorama.addListener("visible_changed", () => {
+      if (panorama.getVisible()) {
+        side.roadviewActive = true;
+        panoDiv.style.display = "block";
+        closeBtn.style.display = "block";
+        mapInner.classList.add("minimap-style");
+        coverageLayer.setMap(map);
+        
+        // 중요: 리사이즈 트리거 후 중심 이동
+        google.maps.event.trigger(map, "resize");
+        setTimeout(() => map.setCenter(panorama.getPosition()), 50);
+      } else {
+        side.roadviewActive = false;
+        panoDiv.style.display = "none";
+        closeBtn.style.display = "none";
+        mapInner.classList.remove("minimap-style");
+        coverageLayer.setMap(null);
+      }
+      google.maps.event.trigger(map, "resize");
+    });
+
+    // [수정] 페그맨 이동 시 미니맵 중심 동기화 (내부 연동)
+    panorama.addListener("position_changed", () => {
+      if(side.roadviewActive) {
+        map.setCenter(panorama.getPosition());
       }
     });
+
+    closeBtn.onclick = () => panorama.setVisible(false);
+    side.map = map;
   }
-  if(type==="kakao"){
-    return new kakao.maps.Map(el,{
-      center:new kakao.maps.LatLng(state.lat,state.lng),
-      level:zoomToKakao(state.zoom)
+
+  // --- 2. KAKAO MAP ---
+  else if(side.type === "kakao") {
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "position:relative;width:100%;height:100%;";
+    
+    const rvDiv = document.createElement("div");
+    rvDiv.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;background:#333;z-index:5;display:none;";
+    
+    const mapDiv = document.createElement("div");
+    mapDiv.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;background:#eee;";
+    
+    const closeBtn = document.createElement("div");
+    closeBtn.className = "close-btn-style";
+    closeBtn.innerHTML = "로드뷰 닫기 X";
+    closeBtn.onclick = () => closeKakaoRoadview(side, rvDiv, mapDiv, closeBtn);
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "kakao-toolbar";
+    
+    const btnData = [
+      { id: 'roadview', text: '로드뷰', action: () => toggleKakaoMode(side, 'roadview', wrapper) },
+      { id: 'district', text: '지적도', action: () => toggleKakaoOverlay(side, 'district') },
+      { id: 'distance', text: '거리', action: () => toggleKakaoMode(side, 'distance', wrapper) },
+      { id: 'area', text: '면적', action: () => toggleKakaoMode(side, 'area', wrapper) },
+      { id: 'clear', text: '초기화', class: 'delete-btn', action: () => clearKakaoMeasurements(side) }
+    ];
+
+    btnData.forEach(bd => {
+      const btn = document.createElement("button");
+      btn.innerHTML = bd.text;
+      if(bd.class) btn.className = bd.class;
+      btn.setAttribute('data-mode', bd.id); 
+      btn.onclick = bd.action;
+      toolbar.appendChild(btn);
     });
-  }
-  if(type==="naver"){
-    return new naver.maps.Map(el,{
-      center:new naver.maps.LatLng(state.lat,state.lng),
-      zoom:state.zoom,
-      maxZoom:21
+
+    mapDiv.appendChild(toolbar);
+    wrapper.appendChild(rvDiv);
+    wrapper.appendChild(closeBtn);
+    wrapper.appendChild(mapDiv);
+    el.appendChild(wrapper);
+
+    const map = new kakao.maps.Map(mapDiv, {
+      center: new kakao.maps.LatLng(state.lat, state.lng),
+      level: zoomToKakao(state.zoom)
     });
+    map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+
+    const rv = new kakao.maps.Roadview(rvDiv);
+    side.panorama = rv; 
+
+    kakao.maps.event.addListener(map, 'center_changed', () => syncFromKakao(side));
+    kakao.maps.event.addListener(map, 'zoom_changed', () => syncFromKakao(side));
+    
+    kakao.maps.event.addListener(map, 'click', (e) => onKakaoMapClick(side, e, rvDiv, mapDiv, closeBtn));
+    kakao.maps.event.addListener(map, 'mousemove', (e) => onKakaoMapMouseMove(side, e));
+    kakao.maps.event.addListener(map, 'rightclick', (e) => onKakaoMapRightClick(side, e));
+
+    // kakao.maps.event.addListener(rv, 'position_changed', () => {
+    //   const pos = rv.getPosition();
+    //   if(side.gis.walker) {
+    //     side.gis.walker.setPosition(pos);
+    //   } else {
+    //     side.gis.walker = new kakao.maps.CustomOverlay({
+    //         position: pos,
+    //         content: createWalkerContent(0),
+    //         map: side.map
+    //     });
+    //   }
+    //   map.setCenter(pos);
+    // });
+    kakao.maps.event.addListener(rv, 'position_changed', () => {
+      // 로드뷰가 활성화된 상태가 아니라면 아무것도 하지 않음
+      if (!side.roadviewActive) return; 
+
+      const pos = rv.getPosition();
+      if(side.gis.walker) {
+        side.gis.walker.setPosition(pos);
+      } else {
+        side.gis.walker = new kakao.maps.CustomOverlay({
+            position: pos,
+            content: createWalkerContent(0),
+            map: side.map
+        });
+      }
+      map.setCenter(pos);
+    });
+
+    
+    kakao.maps.event.addListener(rv, 'viewpoint_changed', () => {
+    //   const vp = rv.getViewpoint();
+    //   if(side.gis.walker) {
+    //     side.gis.walker.setContent(createWalkerContent(vp.pan));
+    //   }
+    // });
+
+      if (!side.roadviewActive) return; // 활성화 상태 체크
+
+      const vp = rv.getViewpoint();
+      if(side.gis.walker) {
+        side.gis.walker.setContent(createWalkerContent(vp.pan));
+      }
+    });
+
+    side.map = map;
+    side.dom = { wrapper, rvDiv, mapDiv, closeBtn, toolbar }; 
+  }
+
+  // --- 3. NAVER MAP ---
+  else if(side.type === "naver") {
+    const mapInner = document.createElement("div");
+    mapInner.style.width = "100%"; mapInner.style.height = "100%";
+    el.appendChild(mapInner);
+
+    const panoDiv = document.createElement("div");
+    panoDiv.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;z-index:15;visibility:hidden;";
+    el.appendChild(panoDiv);
+
+    const closeBtn = document.createElement("div");
+    closeBtn.className = "close-btn-style";
+    closeBtn.innerHTML = "거리뷰 닫기 X";
+    el.appendChild(closeBtn);
+
+    const streetBtn = document.createElement("div");
+    streetBtn.className = "street-btn-style";
+    streetBtn.innerHTML = "거리뷰";
+    mapInner.appendChild(streetBtn);
+
+    const map = new naver.maps.Map(mapInner, {
+        center: new naver.maps.LatLng(state.lat, state.lng),
+        zoom: state.zoom, maxZoom: 21
+    });
+
+    const pano = new naver.maps.Panorama(panoDiv, {
+        position: new naver.maps.LatLng(state.lat, state.lng),
+        pov: { pan: 0, tilt: 0, fov: 100 }, visible: false
+    });
+    side.panorama = pano;
+
+    const streetLayer = new naver.maps.StreetLayer();
+    side.naverState.streetLayer = streetLayer;
+
+    const marker = new naver.maps.Marker({
+        position: map.getCenter(), map: null,
+        icon: { content: '<div class="naver-marker-arrow"></div>', anchor: new naver.maps.Point(8, 10) }
+    });
+    side.naverState.marker = marker; 
+
+    streetBtn.onclick = () => {
+      if (side.naverState.active) {
+        resetNaverRoadview();
+      } else {
+        side.naverState.active = true;
+        streetLayer.setMap(map); 
+        streetBtn.innerHTML = "거리뷰 취소";
+        streetBtn.style.background = "#4DC4FF";
+        streetBtn.style.color = "white";
+        map.setCursor('crosshair');
+      }
+    };
+
+    function resetNaverRoadview() {
+      side.naverState.active = false;
+      side.roadviewActive = false; 
+      streetLayer.setMap(null); 
+      streetBtn.innerHTML = "거리뷰";
+      streetBtn.style.background = "#fff"; streetBtn.style.color = "#333";
+      streetBtn.style.display = 'block';
+      
+      pano.setVisible(false);
+      panoDiv.style.visibility = 'hidden';
+      
+      mapInner.classList.remove('minimap-style');
+      closeBtn.style.display = 'none';
+      
+      marker.setMap(null);
+      map.setCursor('default');
+      setTimeout(() => naver.maps.Event.trigger(map, 'resize'), 100);
+    }
+
+    naver.maps.Event.addListener(map, 'click', (e) => {
+      if (side.naverState.active && streetLayer.getMap()) {
+        const newPos = e.coord;
+        
+        marker.setPosition(newPos);
+        map.setCenter(newPos);
+        map.setZoom(18);
+        pano.setPosition(newPos);
+        
+        if (!mapInner.classList.contains('minimap-style')) {
+            side.roadviewActive = true; 
+            pano.setVisible(true);
+            panoDiv.style.visibility = 'visible';
+            mapInner.classList.add('minimap-style');
+            closeBtn.style.display = 'block';
+            streetBtn.style.display = 'none';
+            marker.setMap(map);
+            map.setCursor('default');
+            naver.maps.Event.trigger(map, 'resize');
+            
+            setTimeout(() => {
+                map.setCenter(newPos);
+                map.setZoom(18); 
+                streetLayer.setMap(map); 
+            }, 150);
+        }
+      }
+    });
+
+    naver.maps.Event.addListener(pano, 'pano_changed', () => {
+      const pos = pano.getPosition();
+      marker.setPosition(pos);
+      map.setCenter(pos); 
+    });
+    
+    naver.maps.Event.addListener(pano, 'pov_changed', () => {
+      const pov = pano.getPov();
+      const arrow = mapInner.querySelector('.naver-marker-arrow');
+      if(arrow) arrow.style.transform = `rotate(${pov.pan}deg)`;
+    });
+
+    closeBtn.onclick = resetNaverRoadview;
+
+    naver.maps.Event.addListener(map, "idle", () => syncFromNaver(side));
+    naver.maps.Event.addListener(map, 'center_changed', () => bindEvents(side, (side === left ? right : left)));
+    naver.maps.Event.addListener(map, 'drag', () => bindEvents(side, (side === left ? right : left)));
+    
+    side.map = map;
   }
 }
 
-/* ===== 카카오 GIS 맵 ===== */
-function createKakaoGISMap(){
-  const rightEl=document.getElementById("rightMap");
-  rightEl.innerHTML="";
-
-  kakaoWrap=document.createElement("div");
-  kakaoWrap.className="kakao-wrap-inner";
-
-  kakaoRoadviewEl=document.createElement("div");
-  kakaoRoadviewEl.id="kakao-roadview";
-
-  rvCloseBtn=document.createElement("div");
-  rvCloseBtn.id="rv-close-btn";
-  rvCloseBtn.innerHTML="로드뷰 닫기 X";
-  rvCloseBtn.onclick=closeKakaoRoadviewUI;
-
-  kakaoMapEl=document.createElement("div");
-  kakaoMapEl.id="kakao-map";
-
-  /* GIS 툴바 */
-  kakaoToolbar=document.createElement("div");
-  kakaoToolbar.className="kakao-toolbar";
-
-  roadviewBtn=document.createElement("button");
-  roadviewBtn.id="btn-roadview";
-  roadviewBtn.innerHTML="로드뷰";
-  roadviewBtn.onclick=()=>toggleMode('roadview');
-
-  districtBtn=document.createElement("button");
-  districtBtn.id="btn-district";
-  districtBtn.innerHTML="지적도";
-  districtBtn.onclick=()=>toggleOverlay('district');
-
-  distanceBtn=document.createElement("button");
-  distanceBtn.id="btn-distance";
-  distanceBtn.innerHTML="거리";
-  distanceBtn.onclick=()=>toggleMode('distance');
-
-  areaBtn=document.createElement("button");
-  areaBtn.id="btn-area";
-  areaBtn.innerHTML="면적";
-  areaBtn.onclick=()=>toggleMode('area');
-
-  clearBtn=document.createElement("button");
-  clearBtn.className="delete-btn";
-  clearBtn.innerHTML="초기화";
-  clearBtn.onclick=clearMeasurements;
-
-  kakaoToolbar.append(roadviewBtn,districtBtn,distanceBtn,areaBtn,clearBtn);
-
-  kakaoMapEl.appendChild(kakaoToolbar);
-  kakaoWrap.append(kakaoRoadviewEl,rvCloseBtn,kakaoMapEl);
-  rightEl.appendChild(kakaoWrap);
-
-  // 카카오맵 초기화
-  kakaoMap=new kakao.maps.Map(kakaoMapEl,{
-    center:new kakao.maps.LatLng(state.lat,state.lng),
-    level:zoomToKakao(state.zoom)
-  });
-
-  kakaoMap.addControl(new kakao.maps.ZoomControl(),kakao.maps.ControlPosition.RIGHT);
-  kakaoRv=new kakao.maps.Roadview(kakaoRoadviewEl);
-  kakaoRvClient=new kakao.maps.RoadviewClient();
-  kakaoGeocoder=new kakao.maps.services.Geocoder();
-  kakaoPs=new kakao.maps.services.Places();
-
-  // GIS 이벤트
-  kakao.maps.event.addListener(kakaoMap,'center_changed',syncFromKakaoGIS);
-  kakao.maps.event.addListener(kakaoMap,'zoom_changed',syncFromKakaoGIS);
-  kakao.maps.event.addListener(kakaoMap,'click',onMapClick);
-  kakao.maps.event.addListener(kakaoMap,'mousemove',onMapMouseMove);
-  kakao.maps.event.addListener(kakaoMap,'rightclick',onMapRightClick);
-
-  // 로드뷰 이벤트
-  kakao.maps.event.addListener(kakaoRv,'viewpoint_changed',onRoadviewViewpointChanged);
-  kakao.maps.event.addListener(kakaoRv,'position_changed',onRoadviewPositionChanged);
-
-  right.map=kakaoMap;
-}
-
-function hideKakaoElements(){
-  if(kakaoWrap) kakaoWrap.style.display="none";
-  currentMode='default';
-  kakaoRvMode=false;
-  clearMeasurements();
-}
-
-/* ===== GIS 기능 ===== */
-function toggleOverlay(type){
-  if(type==='district'){
-    const btn=districtBtn;
+/* =========================================
+   카카오 GIS 로직
+   ========================================= */
+function toggleKakaoOverlay(side, type){
+  if(!side.map) return;
+  if(type === 'district') {
+    const btn = side.dom.toolbar.querySelector('button[data-mode="district"]');
     if(btn.classList.contains('active')){
-      kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      side.map.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
       btn.classList.remove('active');
-    }else{
-      kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+    } else {
+      side.map.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
       btn.classList.add('active');
     }
   }
 }
 
-function toggleMode(mode){
-  if(!kakaoMap) return;
-  stopDrawing();
+function toggleKakaoMode(side, mode, wrapper){
+  if(!side.map) return;
+  stopKakaoDrawing(side); 
 
-  if(mode==='roadview' && currentMode==='roadview'){
-    toggleMode('default');
+  if(side.gis.mode === mode) {
+    toggleKakaoMode(side, 'default', wrapper);
     return;
   }
 
-  [roadviewBtn,distanceBtn,areaBtn].forEach(btn=>btn.classList.remove('active'));
-  const targetBtn=document.getElementById('btn-'+mode);
+  const buttons = side.dom.toolbar.querySelectorAll('button');
+  buttons.forEach(b => b.classList.remove('active'));
+  
+  const targetBtn = side.dom.toolbar.querySelector(`button[data-mode="${mode}"]`);
   if(targetBtn) targetBtn.classList.add('active');
 
-  if(currentMode==='roadview' && mode!=='roadview'){
-    closeKakaoRoadviewUI();
+  if(side.gis.mode === 'roadview' && mode !== 'roadview') {
+    closeKakaoRoadview(side, side.dom.rvDiv, side.dom.mapDiv, side.dom.closeBtn);
   }
 
-  currentMode=mode;
+  side.gis.mode = mode;
 
-  if(mode==='roadview'){
-    kakaoRvMode=true;
-    kakaoRoadviewEl.style.display='block';
-    rvCloseBtn.style.display='block';
-    kakaoMapEl.classList.add('minimap');
-    kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-    setTimeout(()=>{
-      kakaoMap.relayout();
-      kakaoRv.relayout();
-      toggleRoadview(kakaoMap.getCenter());
-    },300);
-  }else if(mode==='distance'||mode==='area'){
-    kakaoMap.setCursor('crosshair');
-  }else{
-    kakaoMap.setCursor('default');
-    if(kakaoRvMode) closeKakaoRoadviewUI();
-  }
-}
-
-function closeKakaoRoadviewUI(){
-  kakaoRvMode=false;
-  currentMode='default';
-  kakaoRoadviewEl.style.display='none';
-  rvCloseBtn.style.display='none';
-  kakaoMapEl.classList.remove('minimap');
-  kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-
-  [roadviewBtn,distanceBtn,areaBtn].forEach(btn=>btn.classList.remove('active'));
-
-  if(kakaoWalker){
-    kakaoWalker.setMap(null);
-    kakaoWalker=null;
-  }
-  setTimeout(()=>{kakaoMap.relayout();},300);
-}
-
-function toggleRoadview(position){
-  kakaoRvClient.getNearestPanoId(position,50,(panoId)=>{
-    if(panoId){
-      kakaoRv.setPanoId(panoId,position);
-      initWalker(position);
+  if(mode === 'roadview'){
+    side.map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+    if(!side.gis.statusEl){
+      side.gis.statusEl = document.createElement('div');
+      side.gis.statusEl.className = 'roadview-status';
+      side.gis.statusEl.innerHTML = '📍 로드뷰 위치를 클릭하세요';
+      side.dom.mapDiv.appendChild(side.gis.statusEl);
     }
-  });
-}
-
-/* ===== 요청 3: 우클릭 주소보기 - 경고창 → 풍선 도움말로 변경 ===== */
-function onMapRightClick(mouseEvent){
-  const pos=mouseEvent.latLng;
-  
-  if(currentMode==='distance' || currentMode==='area'){
-    if(drawingObject && drawingPath.length > 0){
-      const content=currentMode==='distance'
-        ? `<div class="info-overlay">총 거리 <span class="number">${Math.round(drawingObject.getLength()).toLocaleString()}m</span></div>`
-        : (()=>{
-            const area=Math.round(drawingObject.getArea());
-            const pyeong=(area*0.3025).toFixed(1);
-            return `<div class="info-overlay">총 면적 <span class="number">${area.toLocaleString()}m²</span><br><span class="desc">(${Number(pyeong).toLocaleString()}평)</span></div>`;
-          })();
-
-      const overlay=new kakao.maps.CustomOverlay({
-        map:kakaoMap,
-        position:pos,
-        content:content,
-        yAnchor:1
-      });
-      allOverlays.push(overlay);
-      allShapes.push(drawingObject);
-      drawingObject=null;
-      drawingPath=[];
-      return;
-    }
+    side.map.setCursor('crosshair');
+    side.gis.waiting = true; 
+    side.roadviewActive = true; 
+    if(targetBtn) targetBtn.innerHTML = "로드뷰 취소";
+  } 
+  else if (mode === 'distance' || mode === 'area') {
+    side.map.setCursor('crosshair');
+  } 
+  else {
+    side.map.setCursor('default');
   }
-  
-  // 기존 alert 제거 → 풍선 도움말 표시
-  kakaoGeocoder.coord2Address(pos.getLng(), pos.getLat(), (result, status)=>{
-    let address = '주소정보 없음';
-    if(status === kakao.maps.services.Status.OK && result[0]){
-      const addrObj = result[0];
-      if (addrObj.road_address) {
-        address = addrObj.road_address.address_name;
-      } else if (addrObj.address) {
-        address = addrObj.address.address_name;
-      }
-    }
-
-    // 기존 풍선/마커 제거
-    if(rightClickOverlay){ rightClickOverlay.setMap(null); rightClickOverlay=null; }
-    if(rightClickMarker){ rightClickMarker.setMap(null); rightClickMarker=null; }
-
-    // 풍선 도움말 생성
-    const contentHTML = `
-      <div style="
-        background:white;border:1px solid #444;padding:8px 10px;
-        border-radius:6px;font-size:12px;white-space:nowrap;
-        box-shadow:1px 2px 4px rgba(0,0,0,0.3);
-      ">
-        📍 ${address}<br><span style="color:#555;">(${pos.getLat().toFixed(6)}, ${pos.getLng().toFixed(6)})</span>
-      </div>`;
-
-    rightClickOverlay = new kakao.maps.CustomOverlay({
-      map: kakaoMap,
-      position: pos,
-      content: contentHTML,
-      yAnchor: 2.0
-    });
-
-    // 체크 마커 생성
-    rightClickMarker = new kakao.maps.Marker({
-      position: pos,
-      map: kakaoMap,
-      zIndex: 1
-    });
-
-    // 5초 후 자동 제거
-    setTimeout(()=>{
-      if(rightClickOverlay){ rightClickOverlay.setMap(null); rightClickOverlay=null; }
-      if(rightClickMarker){ rightClickMarker.setMap(null); rightClickMarker=null; }
-    }, 5000);
-  });
 }
 
-function onMapClick(mouseEvent){
-  const pos=mouseEvent.latLng;
+function onKakaoMapClick(side, mouseEvent, rvDiv, mapDiv, closeBtn){
+  const pos = mouseEvent.latLng;
 
-  if(currentMode==='roadview'){
-    toggleRoadview(pos);
+  if(side.gis.mode === 'roadview') {
+    if(side.gis.waiting) {
+      side.map.setCursor('default');
+      side.gis.waiting = false;
+      if(side.gis.statusEl) { side.gis.statusEl.remove(); side.gis.statusEl = null; }
+      
+      rvDiv.style.display = 'block';
+      closeBtn.style.display = 'block';
+      mapDiv.classList.add('minimap-style');
+      
+      const btn = side.dom.toolbar.querySelector('button[data-mode="roadview"]');
+      if(btn) btn.innerHTML = "로드뷰";
+
+      setTimeout(() => {
+        side.map.relayout();
+        side.panorama.relayout();
+        moveKakaoRoadview(side, pos);
+      }, 300);
+    } 
+    else {
+      moveKakaoRoadview(side, pos);
+    }
     return;
   }
-  if(currentMode!=='distance' && currentMode!=='area') return;
 
-  drawingPath.push(pos);
-  const marker=new kakao.maps.Marker({position:pos,map:kakaoMap});
-  allMarkers.push(marker);
+  if(side.gis.mode === 'distance' || side.gis.mode === 'area') {
+    side.gis.path.push(pos);
+    const marker = new kakao.maps.Marker({position:pos, map:side.map});
+    side.gis.markers.push(marker);
 
-  if(!drawingObject){
-    drawingObject=currentMode==='distance'
-      ? new kakao.maps.Polyline({
-          map:kakaoMap,
-          path:[pos],
-          strokeWeight:3,
-          strokeColor:'#db4040',
-          strokeOpacity:1,
-          strokeStyle:'solid'
-        })
-      : new kakao.maps.Polygon({
-          map:kakaoMap,
-          path:[pos],
-          strokeWeight:3,
-          strokeColor:'#39f',
-          strokeOpacity:0.8,
-          strokeStyle:'longdash',
-          fillColor:'#39f',
-          fillOpacity:0.2
+    if(!side.gis.drawing) {
+      if(side.gis.mode === 'distance') {
+        side.gis.drawing = new kakao.maps.Polyline({
+          map: side.map, path: [pos], strokeWeight:3, strokeColor:'#db4040', strokeOpacity:1, strokeStyle:'solid'
         });
-  }else{
-    drawingObject.setPath(drawingPath);
-    const content=currentMode==='distance'
-      ? `<div class="measure-label">${Math.round(drawingObject.getLength()).toLocaleString()}m</div>`
-      : (drawingPath.length>=3
-          ? `<div class="measure-label">${Math.round(drawingObject.getArea()).toLocaleString()}m²</div>`
-          : '');
-    if(content){
-      const overlay=new kakao.maps.CustomOverlay({
-        map:kakaoMap,
-        position:pos,
-        content:content,
-        yAnchor:2.5
-      });
-      allOverlays.push(overlay);
+      } else {
+        side.gis.drawing = new kakao.maps.Polygon({
+          map: side.map, path: [pos], strokeWeight:3, strokeColor:'#39f', strokeOpacity:0.8, strokeStyle:'longdash', fillColor:'#39f', fillOpacity:0.2
+        });
+      }
+    } else {
+      side.gis.drawing.setPath(side.gis.path);
+      let content = '';
+      if(side.gis.mode === 'distance') {
+        content = `<div class="measure-label">${Math.round(side.gis.drawing.getLength()).toLocaleString()}m</div>`;
+      } else if (side.gis.path.length >= 3) {
+        content = `<div class="measure-label">${Math.round(side.gis.drawing.getArea()).toLocaleString()}m²</div>`;
+      }
+      if(content) {
+        const overlay = new kakao.maps.CustomOverlay({
+          map: side.map, position: pos, content: content, yAnchor: 2.5
+        });
+        side.gis.overlays.push(overlay);
+      }
     }
   }
 }
 
-function onMapMouseMove(mouseEvent){
-  if(!drawingObject) return;
-  const path=drawingPath.slice();
+function moveKakaoRoadview(side, pos) {
+  kakaoRvClient.getNearestPanoId(pos, 50, (panoId) => {
+    if(panoId) {
+      side.panorama.setPanoId(panoId, pos);
+      if(side.gis.walker) side.gis.walker.setMap(null);
+      side.gis.walker = new kakao.maps.CustomOverlay({
+        position: pos,
+        content: createWalkerContent(0),
+        map: side.map
+      });
+      side.map.setCenter(pos);
+    }
+  });
+}
+
+function onKakaoMapMouseMove(side, mouseEvent) {
+  if(!side.gis.drawing) return;
+  const path = side.gis.path.slice();
   path.push(mouseEvent.latLng);
-  drawingObject.setPath(path);
+  side.gis.drawing.setPath(path);
 }
 
-function clearMeasurements(){
-  allOverlays.forEach(o=>o.setMap(null));
-  allShapes.forEach(s=>s.setMap(null));
-  allMarkers.forEach(m=>m.setMap(null));
-  if(kakaoSearchMarker){ kakaoSearchMarker.setMap(null); kakaoSearchMarker=null; }
-  allOverlays=[];
-  allShapes=[];
-  allMarkers=[];
-  stopDrawing();
-  toggleMode('default');
-}
-
-function stopDrawing(){
-  if(drawingObject){
-    drawingObject.setMap(null);
-    drawingObject=null;
-    drawingPath=[];
+function onKakaoMapRightClick(side, mouseEvent) {
+  if(side.gis.mode === 'distance' || side.gis.mode === 'area') {
+    if(side.gis.drawing && side.gis.path.length > 0) {
+      const pos = mouseEvent.latLng;
+      let content = '';
+      if(side.gis.mode === 'distance') {
+        content = `<div class="info-overlay">총 거리 <span style="font-weight:bold;color:#ee5555">${Math.round(side.gis.drawing.getLength()).toLocaleString()}m</span></div>`;
+      } else {
+        const area = Math.round(side.gis.drawing.getArea());
+        content = `<div class="info-overlay">총 면적 <span style="font-weight:bold;color:#39f">${area.toLocaleString()}m²</span><br>(${Number((area*0.3025).toFixed(1)).toLocaleString()}평)</div>`;
+      }
+      const overlay = new kakao.maps.CustomOverlay({ map: side.map, position: pos, content: content, yAnchor: 1 });
+      side.gis.overlays.push(overlay);
+      side.gis.shapes.push(side.gis.drawing);
+      side.gis.drawing = null;
+      side.gis.path = [];
+    }
+  } else {
+    const pos = mouseEvent.latLng;
+    kakaoGeocoder.coord2Address(pos.getLng(), pos.getLat(), (result, status) => {
+      if(status === kakao.maps.services.Status.OK && result[0]) {
+        const addr = result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name;
+        const contentHTML = `<div style="background:white;border:1px solid #444;padding:8px 10px;border-radius:6px;font-size:12px;box-shadow:1px 2px 4px rgba(0,0,0,0.3);">📍 ${addr}</div>`;
+        const overlay = new kakao.maps.CustomOverlay({ map: side.map, position: pos, content: contentHTML, yAnchor: 2.0 });
+        const marker = new kakao.maps.Marker({ position: pos, map: side.map });
+        setTimeout(()=>{ overlay.setMap(null); marker.setMap(null); }, 5000);
+      }
+    });
   }
 }
 
-/* ===== 워커 (로드뷰 마커) ===== */
+function closeKakaoRoadview(side, rvDiv, mapDiv, closeBtn){
+  side.gis.mode = 'default';
+  side.gis.waiting = false;
+  side.roadviewActive = false;
+  
+  rvDiv.style.display = 'none';
+  closeBtn.style.display = 'none';
+  mapDiv.classList.remove('minimap-style');
+  side.map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+
+  const buttons = side.dom.toolbar.querySelectorAll('button');
+  buttons.forEach(b => b.classList.remove('active'));
+  const btn = side.dom.toolbar.querySelector('button[data-mode="roadview"]');
+  if(btn) btn.innerHTML = "로드뷰";
+
+  if(side.gis.walker) { side.gis.walker.setMap(null); side.gis.walker = null; }
+  if(side.gis.statusEl) { side.gis.statusEl.remove(); side.gis.statusEl = null; }
+
+  side.map.setCursor('default');
+  setTimeout(()=> side.map.relayout(), 300);
+}
+
+function clearKakaoMeasurements(side){
+  side.gis.overlays.forEach(o => o.setMap(null));
+  side.gis.shapes.forEach(s => s.setMap(null));
+  side.gis.markers.forEach(m => m.setMap(null));
+  // [수정] side 객체의 검색 마커 제거
+  if(side.searchMarker) { side.searchMarker.setMap(null); side.searchMarker = null; }
+  if(kakaoSearchMarker) { kakaoSearchMarker.setMap(null); kakaoSearchMarker = null; }
+  
+  side.gis.overlays = []; side.gis.shapes = []; side.gis.markers = [];
+  stopKakaoDrawing(side);
+  toggleKakaoMode(side, 'default', side.dom.wrapper);
+}
+
+function stopKakaoDrawing(side){
+  if(side.gis.drawing) { side.gis.drawing.setMap(null); side.gis.drawing = null; }
+  side.gis.path = [];
+}
+
 function createWalkerContent(angle){
   return `<div class="MapWalker">
     <div class="angleBack" style="transform:rotate(${angle}deg);"></div>
@@ -602,184 +760,260 @@ function createWalkerContent(angle){
   </div>`;
 }
 
-function initWalker(position){
-  if(kakaoWalker){
-    kakaoWalker.setMap(null);
-    kakaoWalker=null;
+/* =========================================
+   완벽한 로드뷰 위치 동기화 (Angle Sync Removed)
+   ========================================= */
+function bindRoadviewSync() {
+  if(left.panorama && right.panorama) {
+    setupSync(left, right);
+    setupSync(right, left);
   }
-  kakaoWalker=new kakao.maps.CustomOverlay({
-    position,
-    content:createWalkerContent(0),
-    map:kakaoMap
-  });
-}
 
-function moveWalker(position){
-  if(kakaoWalker) kakaoWalker.setPosition(position);
-}
+  function setupSync(fromSide, toSide) {
+    const fromPano = fromSide.panorama;
+    const toPano = toSide.panorama;
+    const fromType = fromSide.type;
+    const toType = toSide.type;
 
-function onRoadviewViewpointChanged(){
-  if(kakaoWalker && kakaoRv){
-    const viewpoint=kakaoRv.getViewpoint();
-    kakaoWalker.setContent(createWalkerContent(viewpoint.pan));
+    let posEvent;
+    if (fromType === 'kakao' || fromType === 'google') {
+      posEvent = 'position_changed';
+    } else if (fromType === 'naver') {
+      posEvent = 'pano_changed';
+    }
+
+    // 1. 위치 동기화 (Position Only)
+    const onPosChange = () => {
+      if (rvSyncing) return;
+      
+      let lat, lng;
+      if (fromType === 'google') { const p = fromPano.getPosition(); lat = p.lat(); lng = p.lng(); }
+      else if (fromType === 'naver') { const p = fromPano.getPosition(); lat = p.lat(); lng = p.lng(); } 
+      else if (fromType === 'kakao') { const p = fromPano.getPosition(); lat = p.getLat(); lng = p.getLng(); }
+
+      // 루프 방지
+      if (toType === 'naver') { 
+          const p = toPano.getPosition(); 
+          const curLat = p.lat(); const curLng = p.lng(); 
+          const dist = Math.abs(curLat - lat) + Math.abs(curLng - lng);
+          if(dist < 0.00001) return;
+      }
+
+      rvSyncing = true;
+
+      // To 적용
+      if (toType === 'google') {
+        toPano.setPosition({ lat, lng });
+        releaseSync();
+      } 
+      else if (toType === 'naver') {
+        const nPos = new naver.maps.LatLng(lat, lng);
+        toPano.setPosition(nPos);
+        // [중요] 타겟 네이버 미니맵 & 마커 강제 동기화
+        if(toSide.map) toSide.map.setCenter(nPos);
+        if(toSide.naverState.marker) toSide.naverState.marker.setPosition(nPos);
+        releaseSync(300);
+      }
+      else if (toType === 'kakao') {
+        kakaoRvClient.getNearestPanoId(new kakao.maps.LatLng(lat, lng), 50, (panoId) => {
+          if (panoId) {
+            const newPos = new kakao.maps.LatLng(lat, lng);
+            toPano.setPanoId(panoId, newPos);
+            // [중요] 타겟 카카오 미니맵 강제 동기화
+            if(toSide.map) toSide.map.setCenter(newPos);
+            
+            // [수정] 타겟 카카오맵이 로드뷰 모드일 때만 Walker 표시
+            if (toSide.roadviewActive) {
+                if(toSide.gis.walker) {
+                  toSide.gis.walker.setPosition(newPos);
+                } else {
+                  toSide.gis.walker = new kakao.maps.CustomOverlay({
+                      position: newPos, content: createWalkerContent(0), map: toSide.map
+                  });
+                }
+            }
+          }
+          releaseSync();
+        });
+      }
+    };
+
+    // [중요] Angle Sync Logic 제거됨
+    if(fromType === 'kakao') {
+      kakao.maps.event.addListener(fromPano, posEvent, onPosChange);
+    } else if(fromType === 'naver') {
+      naver.maps.Event.addListener(fromPano, posEvent, onPosChange);
+    } else { // Google
+      fromPano.addListener(posEvent, onPosChange);
+    }
+  }
+
+  function releaseSync(delay = 50) {
+    setTimeout(() => { rvSyncing = false; }, delay);
   }
 }
 
-function onRoadviewPositionChanged(){
-  if(kakaoRv){
-    const rvPos=kakaoRv.getPosition();
-    moveWalker(rvPos);
-    kakaoMap.setCenter(rvPos);
-  }
-}
-
-/* ===== 동기화 ===== */
-function syncFromKakaoGIS(){
-  if(syncing||!kakaoMap||kakaoRvMode) return;
-  syncing=true;
-  syncLock=true;
-  const c=kakaoMap.getCenter();
-  const lvl=kakaoMap.getLevel();
-  state.lat=c.getLat();
-  state.lng=c.getLng();
-  state.zoom=kakaoToZoom(lvl);
-  applyTo(left);
-  setTimeout(()=>{syncing=false;syncLock=false;},50);
-}
-
-function bindEvents(src,target){
+/* ===== 일반 지도 동기화 ===== */
+function bindEvents(src, target){
   if(!src.map) return;
-  if(src.type==="google"){
-    src.map.addListener("center_changed",()=>syncFromGoogle(src,target));
-    src.map.addListener("zoom_changed",()=>syncFromGoogle(src,target));
-    src.map.addListener("drag",()=>syncFromGoogle(src,target));
-  }
-  if(src.type==="kakao" && src.map!==kakaoMap){
-    kakao.maps.event.addListener(src.map,"center_changed",()=>syncFromKakao(src,target));
-    kakao.maps.event.addListener(src.map,"zoom_changed",()=>syncFromKakao(src,target));
-  }
-  if(src.type==="naver"){
-    naver.maps.Event.addListener(src.map,"idle",()=>syncFromNaver(src,target));
+  
+  const handleSync = () => {
+    if(syncing || rvSyncing) return;
+    syncing = true;
+    
+    let center, zoomLevel;
+    if(src.type === 'google') {
+      const c = src.map.getCenter(); center = {lat: c.lat(), lng: c.lng()}; zoomLevel = src.map.getZoom();
+    } else if(src.type === 'kakao') {
+      const c = src.map.getCenter(); center = {lat: c.getLat(), lng: c.getLng()}; zoomLevel = kakaoToZoom(src.map.getLevel());
+    } else if(src.type === 'naver') {
+      const c = src.map.getCenter(); center = {lat: c.y, lng: c.x}; zoomLevel = src.map.getZoom();
+    }
+
+    state.lat = center.lat; state.lng = center.lng; state.zoom = zoomLevel;
+    applyTo(target);
+    setTimeout(() => { syncing = false; }, 50);
+  };
+
+  if(src.type === 'google') {
+    src.map.addListener('center_changed', handleSync); src.map.addListener('zoom_changed', handleSync);
+  } else if(src.type === 'kakao') {
+    kakao.maps.event.addListener(src.map, 'center_changed', handleSync); kakao.maps.event.addListener(src.map, 'zoom_changed', handleSync);
+  } else if(src.type === 'naver') {
+    naver.maps.Event.addListener(src.map, 'center_changed', handleSync);
+    naver.maps.Event.addListener(src.map, 'zoom_changed', handleSync);
+    naver.maps.Event.addListener(src.map, 'drag', handleSync);
   }
 }
 
-function syncFromGoogle(src,target){
-  if(syncing) return;
-  syncing=true;
-  syncLock=true;
-  const c=src.map.getCenter();
-  state={lat:c.lat(),lng:c.lng(),zoom:src.map.getZoom()};
-  applyTo(target);
-  setTimeout(()=>{syncing=false;syncLock=false;},50);
-}
-
-function syncFromKakao(src,target){
-  if(syncing) return;
-  syncing=true;
-  syncLock=true;
-  const c=src.map.getCenter();
-  state.lat=c.getLat();
-  state.lng=c.getLng();
-  state.zoom=kakaoToZoom(src.map.getLevel());
-  applyTo(target);
-  setTimeout(()=>{syncing=false;syncLock=false;},50);
-}
-
-function syncFromNaver(src,target){
-  if(syncing) return;
-  syncing=true;
-  syncLock=true;
-  const c=src.map.getCenter();
-  state={lat:c.lat(),lng:c.lng(),zoom:src.map.getZoom()};
-  applyTo(target);
-  setTimeout(()=>{syncing=false;syncLock=false;},50);
-}
+function syncFromKakao(side) { /* bindEvents로 대체 */ }
+function syncFromNaver(side) { /* bindEvents로 대체 */ }
 
 function applyTo(target){
   if(!target.map) return;
-  if(target.type==="google"){
-    target.map.setCenter(state);
-    target.map.setZoom(Math.min(state.zoom,21));
-  }
-  if(target.type==="kakao"){
-    const lvl=zoomToKakao(state.zoom);
-    const center=new kakao.maps.LatLng(state.lat,state.lng);
-    if(target.map===kakaoMap && !kakaoRvMode){
-      target.map.setCenter(center);
-      target.map.setLevel(lvl);
-    }else if(target.map!==kakaoMap){
-      target.map.setCenter(center);
-      target.map.setLevel(lvl);
-    }
-  }
-  if(target.type==="naver"){
-    target.map.setCenter(new naver.maps.LatLng(state.lat,state.lng));
-    target.map.setZoom(Math.min(state.zoom,21));
+  
+  // [수정] 거리뷰 실행 중에도 맵 연동이 되도록 차단 코드 주석 처리
+  // if(target.roadviewActive) return;
+
+  if(target.type === "google"){
+    target.map.setCenter(state); target.map.setZoom(state.zoom);
+  } else if(target.type === "kakao"){
+    target.map.setCenter(new kakao.maps.LatLng(state.lat, state.lng));
+    target.map.setLevel(zoomToKakao(state.zoom));
+  } else if(target.type === "naver"){
+    target.map.setCenter(new naver.maps.LatLng(state.lat, state.lng));
+    target.map.setZoom(state.zoom);
   }
 }
 
-/* ===== 타입 변경 (외부 토글만 사용) ===== */
-function toggleType(side,btn){
-  side.satellite=!side.satellite;
-  applyType(side,btn);
-}
-
-function applyType(side,btn){
+function toggleType(side, btn){
+  side.satellite = !side.satellite;
   if(!side.map) return;
-  if(side.type==="google"){
-    side.map.setMapTypeId(side.satellite?"satellite":"roadmap");
-  }
-  if(side.type==="kakao"){
-    side.map.setMapTypeId(
-      side.satellite ? kakao.maps.MapTypeId.HYBRID : kakao.maps.MapTypeId.ROADMAP
-    );
-  }
-  if(side.type==="naver"){
-    side.map.setMapTypeId(
-      side.satellite ? naver.maps.MapTypeId.SATELLITE : naver.maps.MapTypeId.NORMAL
-    );
-  }
+  if(side.type === "google") side.map.setMapTypeId(side.satellite ? "satellite" : "roadmap");
+  if(side.type === "kakao") side.map.setMapTypeId(side.satellite ? kakao.maps.MapTypeId.HYBRID : kakao.maps.MapTypeId.ROADMAP);
+  if(side.type === "naver") side.map.setMapTypeId(side.satellite ? naver.maps.MapTypeId.SATELLITE : naver.maps.MapTypeId.NORMAL);
 }
 
-/* ===== 상단 검색 UI ===== */
+function zoomToKakao(z){ return Math.max(1, Math.min(14, 20-z)); }
+function kakaoToZoom(l){ return Math.max(3, Math.min(20, 20-l)); }
+
+/* ===== 검색 및 UI ===== */
 function bindUI(){
-  leftSelect.onchange=()=>{left.type=leftSelect.value;createMaps();};
-  rightSelect.onchange=()=>{right.type=rightSelect.value;createMaps();};
-  leftType.onclick=()=>toggleType(left,leftType);
-  rightType.onclick=()=>toggleType(right,rightType);
+  leftSelect.onchange = () => { left.type = leftSelect.value; createMaps(); };
+  rightSelect.onchange = () => { right.type = rightSelect.value; createMaps(); };
+  
+  leftType.onclick = () => toggleType(left, leftType);
+  rightType.onclick = () => toggleType(right, rightType);
 
-  const input=document.getElementById("searchInput");
-  const btn=document.getElementById("searchBtn");
-  const clearBtnSearch=document.getElementById("clearSearchBtn");
+  const input = document.getElementById("searchInput");
+  const btn = document.getElementById("searchBtn");
+  const clearBtn = document.getElementById("clearSearchBtn");
+  const historySelect = document.getElementById('historySelect');
+  const suggestList = document.getElementById("suggestList");
 
+  const doSearch = () => {
+    const q = input.value.trim();
+    if(q) searchKeyword(q);
+    suggestList.style.display = "none";
+  };
+
+  btn.onclick = doSearch;
+
+  input.addEventListener("keydown", e => {
+    const items = suggestList.querySelectorAll("div");
+    if (suggestList.style.display === "block" && items.length > 0) {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeSuggestIndex++;
+            if (activeSuggestIndex >= items.length) activeSuggestIndex = 0;
+            updateActiveItem(items);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeSuggestIndex--;
+            if (activeSuggestIndex < 0) activeSuggestIndex = items.length - 1;
+            updateActiveItem(items);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (activeSuggestIndex > -1) {
+                items[activeSuggestIndex].click();
+            } else {
+                doSearch();
+            }
+        }
+    } else if (e.key === "Enter") {
+        doSearch();
+    }
+  });
+
+  function updateActiveItem(items) {
+      items.forEach(item => item.classList.remove("active"));
+      if (activeSuggestIndex > -1 && items[activeSuggestIndex]) {
+          items[activeSuggestIndex].classList.add("active");
+          items[activeSuggestIndex].scrollIntoView({ block: "nearest" });
+          input.value = items[activeSuggestIndex].textContent; 
+      }
+  }
+
+  // [수정] 검색창 지움 버튼 로직 변경
+  clearBtn.onclick = () => {
+    input.value = "";
+    // 전역 변수 대신 각 side 객체의 마커를 확인하여 제거
+    [left, right].forEach(side => {
+        if (side.searchMarker) {
+            side.searchMarker.setMap(null);
+            side.searchMarker = null;
+        }
+    });
+    // 레거시 전역 변수 초기화
+    if(kakaoSearchMarker) { kakaoSearchMarker.setMap(null); kakaoSearchMarker = null; }
+  };
+
+  historySelect.addEventListener('change', function() {
+    if(this.value !== "") {
+      const item = searchHistory[this.value];
+      moveToLocation(item.lat, item.lng);
+      input.value = item.name;
+      this.value = "";
+    }
+  });
+  
+  // 자동완성
   input.addEventListener("input",()=>{
     const q=input.value.trim();
-    const suggestList=document.getElementById("suggestList");
-    activeSuggestIndex = -1; // 인덱스 초기화
-    if(!q){
-      suggestList.style.display="none";
-      return;
-    }
+    activeSuggestIndex = -1;
+    if(!q){ suggestList.style.display="none"; return; }
     if(kakaoPs){
       kakaoPs.keywordSearch(q,(r,s)=>{
-        if(s!==kakao.maps.services.Status.OK || !r.length){
-         suggestList.style.display="none";
-         return;
-        }
+        if(s!==kakao.maps.services.Status.OK || !r.length){ suggestList.style.display="none"; return; }
         suggestList.innerHTML="";
-        r.slice(0,10).forEach(item=>{
+        r.slice(0,10).forEach((item, idx)=>{
           const div=document.createElement("div");
-          div.textContent=item.place_name+
-            (item.road_address_name?" ("+item.road_address_name+")":"");
+          div.textContent=item.place_name+(item.road_address_name?" ("+item.road_address_name+")":"");
           div.onclick=()=>{
-            state.lat=parseFloat(item.y);
-            state.lng=parseFloat(item.x);
-            state.zoom=18;
-            applyTo(left);
-            applyTo(right);
-            showSearchMarkersOnBoth(state.lat, state.lng);
+            moveToLocation(item.y, item.x);
             suggestList.style.display="none";
             input.value=item.place_name;
+            addToHistory(item.place_name, item.y, item.x);
           };
           suggestList.appendChild(div);
         });
@@ -788,193 +1022,92 @@ function bindUI(){
     }
   });
 
-  input.addEventListener("keydown",e=>{
-    const suggestList=document.getElementById("suggestList");
-    const items=suggestList.querySelectorAll("div");
-    
-    if(e.key==="Enter"){
-      e.preventDefault();
-      if(items.length>0 && activeSuggestIndex>=0 && items[activeSuggestIndex]){
-        items[activeSuggestIndex].click();
-        return;
+  document.addEventListener("click", e => {
+      if (!e.target.closest(".panel")) {
+          suggestList.style.display = "none";
       }
-      suggestList.style.display="none";
-      const q=input.value.trim();
-      if(q) searchKeyword(q);
-      return;
-    }
-
-    // ★★★★★ 키보드 네비게이션 추가 ★★★★★
-    if(suggestList.style.display==="block" && items.length>0){
-      if(e.key==="ArrowDown"){
-        e.preventDefault();
-        activeSuggestIndex = (activeSuggestIndex + 1) % items.length;
-        updateSuggestHighlight(items);
-      }
-      else if(e.key==="ArrowUp"){
-        e.preventDefault();
-        activeSuggestIndex = activeSuggestIndex > 0 ? activeSuggestIndex - 1 : items.length - 1;
-        updateSuggestHighlight(items);
-      }
-      else if(e.key==="Escape"){
-        e.preventDefault();
-        suggestList.style.display="none";
-        activeSuggestIndex = -1;
-      }
-    }
-  });
-
-  // 키보드 하이라이트 업데이트 함수
-  function updateSuggestHighlight(items){
-    items.forEach((item, index) => {
-      item.classList.toggle('active', index === activeSuggestIndex);
-    });
-    if(items[activeSuggestIndex]){
-      items[activeSuggestIndex].scrollIntoView({block: 'nearest'});
-      input.value = items[activeSuggestIndex].textContent;
-    }
-  }
-
-  btn.onclick=()=>{
-    document.getElementById("suggestList").style.display="none";
-    const q=input.value.trim();
-    if(q) searchKeyword(q);
-  };
-
-  // 지움 버튼 기능 (요청사항1-2 적용)
-  clearBtnSearch.onclick=()=>{
-    input.value="";
-    document.getElementById("suggestList").style.display="none";
-    activeSuggestIndex = -1;
-
-    // 좌측 검색 마커 제거
-    if(searchMarkerLeft){
-      if(left.type==="google" || left.type==="kakao" || left.type==="naver"){
-        searchMarkerLeft.setMap(null);
-      }
-      searchMarkerLeft=null;
-    }
-    // 우측 검색 마커 제거
-    if(searchMarkerRight){
-      if(right.type==="google" || right.type==="kakao" || right.type==="naver"){
-        searchMarkerRight.setMap(null);
-      }
-      searchMarkerRight=null;
-    }
-    // 우측 카카오 GIS 전용 검색 마커 제거
-    if(kakaoSearchMarker){
-      kakaoSearchMarker.setMap(null);
-      kakaoSearchMarker=null;
-    }
-  };
-
-  document.addEventListener("click",e=>{
-    if(!e.target.closest("#controls")){
-      document.getElementById("suggestList").style.display="none";
-      activeSuggestIndex = -1;
-    }
   });
 }
 
-/* ===== 검색 마커 표시 (좌/우 모두) ===== */
-function showSearchMarkersOnBoth(lat, lng){
-  showSearchMarkerForSide('left', lat, lng);
-  showSearchMarkerForSide('right', lat, lng);
+function moveToLocation(lat, lng) {
+  state.lat = parseFloat(lat); state.lng = parseFloat(lng); state.zoom = 18;
+  applyTo(left); applyTo(right);
+  showSearchMarkers(lat, lng);
 }
 
-function showSearchMarkerForSide(sideName, lat, lng){
-  const side = sideName === 'left' ? left : right;
-  let markerRef = sideName === 'left' ? searchMarkerLeft : searchMarkerRight;
+// [수정] 마커 표시 함수: 전역 변수 의존성을 제거하고 자료형 문제 해결
+function showSearchMarkers(lat, lng) {
+  [left, right].forEach(side => {
+    if(!side.map) return;
 
-  // 기존 마커 제거
-  if(markerRef){
-    if(side.type === 'kakao' || side.type === 'google' || side.type === 'naver'){
-      markerRef.setMap(null);
+    // 1. 기존 마커 제거
+    if (side.searchMarker) {
+        side.searchMarker.setMap(null);
+        side.searchMarker = null;
     }
-  }
 
-  if(!side.map) return;
+    let marker = null;
 
-  // 좌우 타입별 마커 생성
-  if(side.type === 'google'){
-    const position = {lat: lat, lng: lng};
-    markerRef = new google.maps.Marker({
-      position: position,
-      map: side.map,
-      icon: {
-        url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAyNCAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDBMMCAxNiBMNiAxNiBMNiAyNCBMMTIgMjQgTDE4IDE2IEwyNCAxNiBaIiBmaWxsPSIjRkY0MDAwIi8+CjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjMiIGZpbGw9IiNGRkYiLz4KPC9zdmc+',
-        scaledSize: new google.maps.Size(24, 32)
-      }
-    });
-  }else if(side.type === 'naver'){
-    markerRef = new naver.maps.Marker({
-      position: new naver.maps.LatLng(lat, lng),
-      map: side.map
-    });
-  }else if(side.type === 'kakao'){
-    markerRef = new kakao.maps.Marker({
-      position: new kakao.maps.LatLng(lat, lng),
-      map: side.map
-    });
-  }
+    // 2. 구글맵: lat, lng를 Number로 변환
+    if(side.type === 'google') {
+        marker = new google.maps.Marker({ 
+            position: { lat: parseFloat(lat), lng: parseFloat(lng) }, 
+            map: side.map 
+        });
+    }
+    // 3. 네이버맵
+    else if(side.type === 'naver') {
+        marker = new naver.maps.Marker({ 
+            position: new naver.maps.LatLng(lat, lng), 
+            map: side.map 
+        });
+    }
+    // 4. 카카오맵
+    else if(side.type === 'kakao') {
+        marker = new kakao.maps.Marker({ 
+            position: new kakao.maps.LatLng(lat, lng), 
+            map: side.map 
+        });
+    }
 
-  if(sideName === 'left'){
-    searchMarkerLeft = markerRef;
-  }else{
-    searchMarkerRight = markerRef;
-  }
+    // 5. 생성된 마커 저장
+    side.searchMarker = marker;
+  });
+}
+
+function addToHistory(name, lat, lng) {
+  searchHistory = searchHistory.filter(i => i.name !== name);
+  searchHistory.unshift({ name, lat, lng });
+  if(searchHistory.length > 7) searchHistory.pop();
+  localStorage.setItem('mapSearchHistory', JSON.stringify(searchHistory));
+  renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('historySelect');
+  el.innerHTML = '<option value="">최근 검색 기록</option>';
+  searchHistory.forEach((item, idx) => {
+    const opt = document.createElement('option');
+    opt.value = idx; opt.text = item.name;
+    el.appendChild(opt);
+  });
 }
 
 function searchKeyword(q){
-  if(kakaoGeocoder && kakaoPs){
-    kakaoGeocoder.addressSearch(q,(res,status)=>{
-      if(status===kakao.maps.services.Status.OK && res[0]){
-        state.lat=parseFloat(res[0].y);
-        state.lng=parseFloat(res[0].x);
-        state.zoom=18;
-        applyTo(left);
-        applyTo(right);
-        showSearchMarkersOnBoth(state.lat, state.lng);
-        // 우측 카카오 GIS 맵 마커
-        if(kakaoMap){
-         if(kakaoSearchMarker) kakaoSearchMarker.setMap(null);
-         kakaoSearchMarker = new kakao.maps.Marker({
-           position: new kakao.maps.LatLng(state.lat, state.lng),
-           map: kakaoMap
-         });
+  if(!kakaoGeocoder) return;
+  kakaoGeocoder.addressSearch(q, (res, status) => {
+    if(status === kakao.maps.services.Status.OK) {
+      moveToLocation(res[0].y, res[0].x);
+      addToHistory(res[0].address_name, res[0].y, res[0].x);
+    } else {
+      kakaoPs.keywordSearch(q, (r, s) => {
+        if(s === kakao.maps.services.Status.OK) {
+          moveToLocation(r[0].y, r[0].x);
+          addToHistory(r[0].place_name, r[0].y, r[0].x);
         }
-      }else{
-        kakaoPs.keywordSearch(q,(r,s)=>{
-         if(s===kakao.maps.services.Status.OK && r[0]){
-           state.lat=parseFloat(r[0].y);
-           state.lng=parseFloat(r[0].x);
-           state.zoom=18;
-           applyTo(left);
-           applyTo(right);
-           showSearchMarkersOnBoth(state.lat, state.lng);
-           // 우측 카카오 GIS 맵 마커
-           if(kakaoMap){
-              if(kakaoSearchMarker) kakaoSearchMarker.setMap(null);
-              kakaoSearchMarker = new kakao.maps.Marker({
-                position: new kakao.maps.LatLng(state.lat, state.lng),
-                map: kakaoMap
-              });
-           }
-         }
-        });
-      }
-    });
-  }
-}
-
-/* ===== Zoom 변환 ===== */
-function zoomToKakao(z){
-  let l=20-z;
-  return Math.max(1,Math.min(14,l));
-}
-function kakaoToZoom(l){
-  let z=20-l;
-  return Math.max(3,Math.min(20,z));
+      });
+    }
+  });
 }
 </script>
 </body>
